@@ -112,3 +112,15 @@ UniversityAI/
 3. 新增 `application/xxx/repository.py` 和 `use_cases.py`
 4. 新增 `presentation/api/xxx/routes.py`
 5. 修改 `main.py` 註冊 router
+
+
+## 測試（BDD）
+
+`ash
+pytest tests/
+`
+
+## n8n 整合
+
+詳見 [N8N_INTEGRATION.md](N8N_INTEGRATION.md)
+
