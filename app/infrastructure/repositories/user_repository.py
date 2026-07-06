@@ -1,0 +1,61 @@
+from abc import ABC, abstractmethod
+from app.presentation.schemas.user import UserRead, UserCreate
+
+class UserRepository(ABC):
+    @abstractmethod
+    def get_all(self) -> list[UserRead]:
+        pass
+
+    @abstractmethod
+    def get_by_id(self, user_id: int) -> UserRead | None:
+        pass
+
+    @abstractmethod
+    def create(self, user_data: UserCreate) -> UserRead:
+        pass
+
+    @abstractmethod
+    def update(self, user_id: int, user_data: UserCreate) -> UserRead | None:
+        pass
+
+    @abstractmethod
+    def delete(self, user_id: int) -> bool:
+        pass
+
+
+class InMemoryUserRepository(UserRepository):
+    def __init__(self):
+        self.users = [
+            UserRead(id=1, name="Alice"),
+            UserRead(id=2, name="Bob"),
+        ]
+
+    def get_all(self) -> list[UserRead]:
+        return self.users
+
+    def get_by_id(self, user_id: int) -> UserRead | None:
+        for user in self.users:
+            if user.id == user_id:
+                return user
+        return None
+
+    def create(self, user_data: UserCreate) -> UserRead:
+        new_id = max([user.id for user in self.users], default=0) + 1
+        new_user = UserRead(id=new_id, name=user_data.name)
+        self.users.append(new_user)
+        return new_user
+
+    def update(self, user_id: int, user_data: UserCreate) -> UserRead | None:
+        for index, user in enumerate(self.users):
+            if user.id == user_id:
+                updated_user = UserRead(id=user_id, name=user_data.name)
+                self.users[index] = updated_user
+                return updated_user
+        return None
+
+    def delete(self, user_id: int) -> bool:
+        for index, user in enumerate(self.users):
+            if user.id == user_id:
+                del self.users[index]
+                return True
+        return False
