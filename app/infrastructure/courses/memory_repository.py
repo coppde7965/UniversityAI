@@ -1,37 +1,37 @@
-﻿from typing import List, Optional
-
-from app.domain.courses.entities import Course
-
+﻿from app.domain.courses.entities import Course
 
 class CourseMemoryRepository:
     def __init__(self):
-        self._courses: dict[int, Course] = {}
-        self._counter: int = 0
-        self._seed_data()
+        self.courses = [
+            Course(id=1, title="Introduction to Computer Science", description="Basic CS concepts", credits=3, status="approved"),
+            Course(id=2, title="Data Structures", description="Learn about arrays, linked lists, trees", credits=4, status="draft"),
+        ]
 
-    def _seed_data(self):
-        self.add("Introduction to Computer Science", "Basic CS concepts", 3)
-        self.add("Data Structures", "Learn about arrays, linked lists, trees", 4)
+    def get_all(self):
+        return self.courses
 
-    def add(self, title: str, description: str = "", credits: int = 3) -> Course:
-        self._counter += 1
-        course = Course(
-            id=self._counter,
-            title=title,
-            description=description,
-            credits=credits,
-        )
-        self._courses[self._counter] = course
-        return course
+    def get_by_id(self, course_id: int):
+        for course in self.courses:
+            if course.id == course_id:
+                return course
+        return None
 
-    def get_all(self) -> List[Course]:
-        return list(self._courses.values())
+    def create(self, title: str, description: str, credits: int):
+        new_id = max([course.id for course in self.courses], default=0) + 1
+        new_course = Course(id=new_id, title=title, description=description, credits=credits, status="draft")
+        self.courses.append(new_course)
+        return new_course
 
-    def get_by_id(self, course_id: int) -> Optional[Course]:
-        return self._courses.get(course_id)
-
-    def delete(self, course_id: int) -> bool:
-        if course_id in self._courses:
-            del self._courses[course_id]
-            return True
-        return False
+    def update(self, course_id: int, title: str, description: str, credits: int):
+        for index, course in enumerate(self.courses):
+            if course.id == course_id:
+                updated_course = Course(
+                    id=course_id,
+                    title=title,
+                    description=description,
+                    credits=credits,
+                    status=getattr(course, "status", "draft"),
+                )
+                self.courses[index] = updated_course
+                return updated_course
+        return None

@@ -1,0 +1,2 @@
+﻿# UniversityAI structure
+

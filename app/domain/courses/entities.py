@@ -1,8 +1,12 @@
-﻿from pydantic import BaseModel, Field
+﻿from dataclasses import dataclass
+from typing import Literal
 
+CourseStatus = Literal["draft", "approved", "rejected"]
 
-class Course(BaseModel):
+@dataclass
+class Course:
     id: int
-    title: str = Field(..., min_length=1)
-    description: str = Field(default="")
-    credits: int = Field(default=3, ge=0)
+    title: str
+    description: str
+    credits: int
+    status: CourseStatus = "draft"

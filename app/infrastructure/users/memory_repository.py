@@ -4,8 +4,8 @@ from app.presentation.schemas.user import UserRead, UserCreate
 class InMemoryUserRepository(UserRepository):
     def __init__(self):
         self.users = [
-            UserRead(id=1, name="Alice"),
-            UserRead(id=2, name="Bob"),
+            UserRead(id=1, name="Alice", role="student"),
+            UserRead(id=2, name="Bob", role="teacher"),
         ]
 
     def get_all(self) -> list[UserRead]:
@@ -19,14 +19,14 @@ class InMemoryUserRepository(UserRepository):
 
     def create(self, user_data: UserCreate) -> UserRead:
         new_id = max([user.id for user in self.users], default=0) + 1
-        new_user = UserRead(id=new_id, name=user_data.name)
+        new_user = UserRead(id=new_id, name=user_data.name, role=user_data.role)
         self.users.append(new_user)
         return new_user
 
     def update(self, user_id: int, user_data: UserCreate) -> UserRead | None:
         for index, user in enumerate(self.users):
             if user.id == user_id:
-                updated_user = UserRead(id=user_id, name=user_data.name)
+                updated_user = UserRead(id=user_id, name=user_data.name, role=user_data.role)
                 self.users[index] = updated_user
                 return updated_user
         return None

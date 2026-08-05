@@ -1,0 +1,18 @@
+﻿use_default_settings: true
+
+server:
+  secret_key: "zxcvbnm,./asdfghjkl;'qwertyuiop"
+  bind_address: "0.0.0.0"
+  port: 8080
+  image_proxy: true
+  limiter: false
+  base_url: "http://210.208.224.12:8080/"
+
+valkey:
+  url: "redis://redis:6379/0"
+
+search:
+  safe_search: 1
+  autocomplete: duckduckgo
+  formats:
+    - html

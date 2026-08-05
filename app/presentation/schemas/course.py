@@ -1,14 +1,16 @@
-﻿from pydantic import BaseModel, Field
+﻿from pydantic import BaseModel
+from typing import Literal
 
+CourseStatus = Literal["draft", "approved", "rejected"]
 
 class CourseCreate(BaseModel):
-    title: str = Field(..., min_length=1)
-    description: str = Field(default="")
-    credits: int = Field(default=3, ge=0)
-
+    title: str
+    description: str
+    credits: int
 
 class CourseResponse(BaseModel):
     id: int
     title: str
     description: str
     credits: int
+    status: CourseStatus
