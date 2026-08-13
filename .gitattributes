@@ -1,0 +1,29 @@
+# 行尾正規化
+#
+# Windows 上 git 的 core.autocrlf=true 會在 checkout 時把 LF 轉成 CRLF。
+# 對容器內執行的檔案來說這是致命的：sh 會把 shebang 讀成 "/bin/sh\r"，
+# 錯誤訊息是 "bad interpreter: /bin/sh^M"，而且看起來完全不像行尾問題。
+#
+# 這會直接打破 NFR-MNT-05（clone 之後 make up 就能得到可展示的系統），
+# 所以強制這些檔案一律為 LF，不受主機設定影響。
+
+* text=auto eol=lf
+
+*.sh          text eol=lf
+Makefile      text eol=lf
+Dockerfile    text eol=lf
+*.php         text eol=lf
+*.yaml        text eol=lf
+*.yml         text eol=lf
+*.json        text eol=lf
+*.ini         text eol=lf
+*.conf        text eol=lf
+*.feature     text eol=lf
+*.mustache    text eol=lf
+
+# 二進位，不要碰
+*.png         binary
+*.jpg         binary
+*.pdf         binary
+*.docx        binary
+*.sql         -text

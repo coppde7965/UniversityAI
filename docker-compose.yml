@@ -1,0 +1,193 @@
+# UniversityAI 開發與展示環境
+#
+# 對應 docs/architecture.md §7、docs/SRS.md D-04（一切執行環境皆以 Docker 提供）。
+# 主機端只需 Docker 與 GNU Make，不安裝 PHP、Composer、Node 或 Python。
+#
+# 這份檔案取代了原本的 docker-compose.yml（SearXNG + Redis），該檔隨 OI-05
+# 一併移除。檔名沿用 docker-compose.yml 而非 Compose 規範現行的 compose.yaml
+# ——兩者 Docker Compose 都支援，行為完全相同。
+
+name: universityai
+
+# ---------------------------------------------------------------------------
+# 網頁容器與工具容器必須看到完全相同的檔案樹，否則會出現
+# 「網頁上正常、測試說找不到外掛」這類難查的落差。用錨點共用定義。
+# ---------------------------------------------------------------------------
+x-code-volumes: &code-volumes
+  # Moodle 本體用**具名磁碟區**，不掛在專案目錄下。
+  #
+  # 這是 D-04「掛載於專案目錄下」的第二個例外，理由與資料庫那個不同：
+  # Windows 的 Docker bind mount 對大量小檔案讀取極慢，實測讀 400 個 PHP
+  # 檔要 10.45 秒，同樣的檔案在容器內部檔案系統是 0.00 秒。Moodle 每個
+  # 請求要載入數百個核心檔案，放 bind mount 上頁面載入 14 秒，遠超過
+  # NFR-PRF-04 要求的 2 秒。opcache 與 realpath 快取都救不了。
+  #
+  # 可攜性不受影響：Moodle 核心不是資料也不是我們的程式碼，換機器時由
+  # make up 重新取得 MOODLE_TAG 指定的版本，本來就不需要跟著搬。
+  #
+  # 代價：無法從主機直接瀏覽 Moodle 核心原始碼。要讀核心程式時用
+  # make shell 進容器，或把整個專案移到 WSL2 的檔案系統下（見 README）。
+  - moodlesrc:/var/www/moodle
+
+  # 外掛原始碼。這是我們的產品程式碼，進版控。
+  # 路徑全在 public/ 之下——Moodle 自 5.1 起把網站根目錄移入 public/（D-09）。
+  # 供應商外掛的目錄名是 claude 而非 aiprovider_claude：Moodle 的慣例是
+  # 路徑不含外掛類型前綴。
+  #
+  # ⚠ 只掛載**已經有 version.php** 的外掛。
+  # Moodle 會掃描外掛目錄，掃到缺 version.php 的目錄就以 detectedbrokenplugin
+  # 中止**整個安裝流程**——不是忽略它。實測撞到過，錯誤訊息只說某個外掛
+  # 「毀損或是舊版」，看不出是空目錄造成的。
+  #
+  # 下面兩行於對應階段開始時解除註解（SRS §8.4）：
+  #   aiprovider_claude → 第一‧五階段
+  #   block_universityai → 第四階段
+  - ./plugins/local_universityai:/var/www/moodle/public/local/universityai
+  # - ./plugins/block_universityai:/var/www/moodle/public/blocks/universityai
+  # - ./plugins/aiprovider_claude:/var/www/moodle/public/ai/provider/claude
+
+  # 三個資料目錄，全部 .gitignore
+  - ./moodledata:/var/www/moodledata
+  - ./behatdata:/var/www/behatdata
+  - ./phpunitdata:/var/www/phpunitdata
+
+  # 補充設定，由 config.php 以 require_once 載入（architecture.md §7.4）
+  - ./docker/config-extra.php:/opt/uai/config-extra.php:ro
+
+  # 去識別化規則。PHP 與 Python 兩邊讀同一份（A-05）
+  - ./redaction-rules.json:/opt/uai/redaction-rules.json:ro
+
+  # 資料庫傾印的輸出位置。這是換機展示的搬移方式（D-04）
+  - ./db/dumps:/dumps
+
+services:
+  # -------------------------------------------------------------------------
+  # 網頁伺服器與 PHP
+  # -------------------------------------------------------------------------
+  moodle:
+    build:
+      context: ./docker
+      dockerfile: moodle/Dockerfile
+      target: web
+    env_file: .env
+    volumes: *code-volumes
+    ports:
+      - "${MOODLE_PORT:-8080}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+      mail:
+        condition: service_started
+    networks: [uai]
+    restart: unless-stopped
+
+  # -------------------------------------------------------------------------
+  # 資料庫
+  #
+  # 資料目錄用具名磁碟區，是「volumes 置於專案目錄下」的唯一例外（D-04）：
+  # 跨機器複製資料庫實體檔案在版本、位元組序與檔案鎖上都不可靠，
+  # 在 Windows 主機上掛載資料目錄更是已知的權限與效能痛點。
+  # 可攜性改由 make db-dump 產出 SQL 傾印到 db/dumps/ 達成。
+  # -------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    environment:
+      # 讓 pg_dump/pg_restore 不必每次輸入密碼
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./db/dumps:/dumps
+    healthcheck:
+      # moodle 等這個健康檢查通過才啟動，避免第一次 up 時安裝腳本撲空
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      # 刻意不用 5432，避免與主機上既有的 PostgreSQL 衝突
+      - "${POSTGRES_PORT:-55432}:5432"
+    networks: [uai]
+    restart: unless-stopped
+
+  # -------------------------------------------------------------------------
+  # 信件攔截
+  #
+  # 本機站台沒有對外寄信管道（D-04），Moodle 的 SMTP 一律指向這裡。
+  # FR-NTF-01 的人工驗收就是在它的網頁介面上看信。
+  # -------------------------------------------------------------------------
+  mail:
+    image: axllent/mailpit:v1.30
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+    networks: [uai]
+    restart: unless-stopped
+
+  # -------------------------------------------------------------------------
+  # Behat 用的瀏覽器
+  #
+  # 凡標記 @javascript 的場景都走它（bdd-guide §6），對 Behat 是必要的。
+  # 7900 埠是 noVNC，用瀏覽器打開就能看到測試實際在點什麼——
+  # 場景失敗但看不出原因時，這個比讀 log 快得多。
+  #
+  # 但它**不在預設啟動集合中**（profile: test）。映像將近 2 GB，而第一、
+  # 二階段還沒有 Behat 場景，展示機更是永遠不需要瀏覽器容器——NFR-MNT-05
+  # 要求的展示流程只有 make up 與 make install。把它排除在預設之外，可以
+  # 讓新機器第一次 make up 少下載 2 GB，也少一個拉取失敗的機會。
+  #
+  # make behat 會自動把它拉起來，不需要手動處理。
+  # -------------------------------------------------------------------------
+  selenium:
+    image: selenium/standalone-chrome:151.0-20260808
+    profiles: ["test"]
+    shm_size: 2gb
+    ports:
+      - "${SELENIUM_VNC_PORT:-7900}:7900"
+    networks: [uai]
+    restart: unless-stopped
+
+  # -------------------------------------------------------------------------
+  # 工具容器
+  #
+  # 與 moodle 同一個 base 映像，確保 PHP 版本與擴充完全一致。
+  # 不跑網頁伺服器，長駐等待 exec；lint 與測試在這裡執行。
+  # -------------------------------------------------------------------------
+  tools:
+    build:
+      context: ./docker
+      dockerfile: moodle/Dockerfile
+      target: tools
+    env_file: .env
+    volumes: *code-volumes
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [uai]
+    restart: unless-stopped
+
+  # -------------------------------------------------------------------------
+  # Python 評測工具鏈（bdd-guide 的 L3 層）
+  #
+  # 不隨外掛發行，因此不受上架規範約束，相依以 uv 管理（SRS §2.5）。
+  #
+  # 同樣不在預設啟動集合中（profile: eval）——第三階段才會實際用到，
+  # 展示機也不需要。make eval 會自動把它拉起來。
+  # -------------------------------------------------------------------------
+  eval:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    profiles: ["eval"]
+    working_dir: /work
+    volumes:
+      - ./eval:/work
+      - ./redaction-rules.json:/opt/uai/redaction-rules.json:ro
+    command: ["sleep", "infinity"]
+    networks: [uai]
+    restart: unless-stopped
+
+volumes:
+  dbdata:
+  moodlesrc:
+
+networks:
+  uai:
+    driver: bridge

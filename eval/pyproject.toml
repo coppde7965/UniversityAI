@@ -1,0 +1,26 @@
+[project]
+name = "universityai-eval"
+version = "0.1.0"
+description = "UniversityAI 課綱解析的正確率評測工具鏈（bdd-guide 的 L3 層）"
+requires-python = ">=3.12"
+
+# 不隨外掛發行，因此不受 D-07 的上架規範約束，語言與相依可自由選擇。
+# 取代原專案的 requirements.txt——那份含大量與評測無關的相依（FastAPI、
+# Flask、uvicorn），遷移時只保留評測實際需要的部分（SRS §2.5）。
+dependencies = [
+    "pypdf>=5.1.0",
+    "python-docx>=1.1.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+]
+
+[tool.uv]
+# uv.lock 必須進版控：正確率量測的結果要可重現，這是 FR-SYL-02 的驗收
+# 數字有意義的前提（SRS §2.5）。
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
