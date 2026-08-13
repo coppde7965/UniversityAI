@@ -1,6 +1,0 @@
-﻿general:
-  debug: false
-server:
-  port: 8080
-search:
-  safe_search: 0
