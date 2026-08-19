@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!--
+  第三方程式庫宣告（NFR-MNT-04 的上架必要項）。
+
+  這個檔案不只是形式：moodle-plugin-ci 與 Moodle 的程式碼檢查會讀它，
+  並把宣告過的路徑排除在編碼規範檢查之外。沒有它，phpcs 會對著別人的
+  程式碼報幾百則格式錯誤，而那些錯誤既不該修也修不得。
+
+  為什麼需要 PdfParser：A-18 決定課綱先在本地抽成文字再送模型，而 Moodle
+  核心沒有帶 PDF 解析器（lib/pdflib.php 是 TCPDF，只能產生不能解析）。
+  詳細的取捨見 docs/architecture.md §9.10 與 A-19。
+-->
+<libraries>
+  <library>
+    <location>thirdparty/pdfparser</location>
+    <name>PdfParser</name>
+    <description>Pure-PHP library that extracts text and metadata from PDF files. Used to convert an uploaded syllabus into plain text before it is sent to a language model (A-18).</description>
+    <version>2.12.5</version>
+    <license>LGPL</license>
+    <licenseversion>3.0</licenseversion>
+    <repository>https://github.com/smalot/pdfparser</repository>
+    <copyrights>
+      <copyright>2017 Sebastien MALOT (sebastien#malot.fr)</copyright>
+    </copyrights>
+  </library>
+</libraries>

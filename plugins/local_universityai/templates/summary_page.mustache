@@ -1,0 +1,80 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_universityai/summary_page
+
+    Weekly course summaries (FR-SUM-01).
+
+    The summary body is model-generated text. It is rendered through the default
+    Mustache escaping as plain paragraphs on purpose: allowing markup here would
+    turn model output into an injection path, and a summary needs no formatting.
+
+    Context variables required for this template:
+    * hasitems boolean - Whether any summary exists yet.
+    * items array - One entry per teaching week, newest first.
+
+    Example context (json):
+    {
+        "hasitems": true,
+        "items": [
+            {
+                "weekno": 3,
+                "weeklabel": "Week 3",
+                "weekrange": "23 September 2025",
+                "paragraphs": [{"text": "This week covers knowledge representation."}],
+                "isnoschedule": false,
+                "generatedat": "22/09/25, 06:00",
+                "model": "claude-haiku-4-5",
+                "hasmodel": true,
+                "syllabusversion": 1,
+                "version": 1,
+                "isrevision": false
+            }
+        ]
+    }
+}}
+<div class="local-universityai-summaries">
+    {{^hasitems}}
+        <div class="alert alert-info" role="status">
+            {{#str}}summary:none, local_universityai{{/str}}
+        </div>
+    {{/hasitems}}
+    {{#items}}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h3 class="card-title h5">
+                    {{weeklabel}}
+                    <span class="text-muted fw-normal ms-2">{{weekrange}}</span>
+                    {{#isnoschedule}}
+                        <span class="badge bg-secondary ms-2">{{#str}}summary:badgenoschedule, local_universityai{{/str}}</span>
+                    {{/isnoschedule}}
+                    {{#isrevision}}
+                        <span class="badge bg-light text-dark ms-2">{{versionlabel}}</span>
+                    {{/isrevision}}
+                </h3>
+                {{#paragraphs}}
+                    <p class="card-text">{{text}}</p>
+                {{/paragraphs}}
+                <p class="card-text small text-muted mb-0">
+                    {{#str}}summary:generatedat, local_universityai{{/str}} {{generatedat}}
+                    &middot; {{#str}}summary:fromsyllabus, local_universityai{{/str}} {{syllabusversion}}
+                    {{#hasmodel}}&middot; {{#str}}summary:bymodel, local_universityai{{/str}} {{model}}{{/hasmodel}}
+                </p>
+            </div>
+        </div>
+    {{/items}}
+</div>

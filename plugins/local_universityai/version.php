@@ -17,8 +17,14 @@
 /**
  * 外掛版本資訊。
  *
- * 目前是骨架，只讓外掛能被 Moodle 認出並安裝。實際功能自第一階段開始
- * （SRS §8.4）。
+ * 第一階段（SRS §8.4）：四張資料表、七項能力、一個排程任務、一個訊息
+ * 提供者與站台設定頁。
+ *
+ * 第二階段：每週摘要（FR-SUM-01）。新增第五張表、第二個排程任務、外送資料
+ * 過濾元件與生成類 AI 呼叫的收口。這是第一條端到端可運作的鏈路。
+ *
+ * 第三階段：課綱上傳與解析（FR-SYL-01、FR-SYL-02）。新增文字抽取、
+ * DM-SYLLABUS 的 schema 與驗證、抽取器接縫、自訂事件與臨機任務。
  *
  * GPL 檔頭與著作權標註自第一個檔案就寫上——D-07 的判斷是「補做比一開始
  * 就遵守貴得多」，這是上架審查的必要項（NFR-MNT-04）。
@@ -36,11 +42,11 @@ defined('MOODLE_INTERNAL') || die();
 $plugin->component = 'local_universityai';
 
 // 格式為 YYYYMMDDXX。每次改動資料表或需要觸發升級時遞增。
-$plugin->version = 2026081300;
+$plugin->version = 2026081900;
 
 // Moodle 5.2 的分支版本號（D-09）。低於此版的站台不得安裝——
 // 5.2 之前的 AI 子系統沒有供應商執行個體 API，整套設計不成立。
 $plugin->requires = 2026042000;
 
 $plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '0.1.0';
+$plugin->release = '0.2.0';

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/universityai/db" VERSION="20260817" COMMENT="UniversityAI 的資料表。設計與理由見 docs/architecture.md §3。"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="local_universityai_syllabus" COMMENT="一列一個課綱版本，對應 DM-SYLLABUS。整份結構以 JSON 存於 payload，理由見 A-02。">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="上傳時即繫結，課程外殼必定先存在（D-10）"/>
+        <FIELD NAME="version" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="同一課程內單調遞增，語意是第幾次上傳"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="uploaded" SEQUENCE="false" COMMENT="uploaded / parsed / confirmed（FR-SYL-01、FR-SYL-04）"/>
+        <FIELD NAME="payload" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="DM-SYLLABUS 全文 JSON；status=uploaded 時為 null——上傳與解析是兩個時刻，用空字串佔位會讓「還沒解析」與「解析出空結果」分不開"/>
+        <FIELD NAME="contenthash" TYPE="char" LENGTH="40" NOTNULL="true" SEQUENCE="false" COMMENT="原始檔案的 Moodle 檔案 contenthash"/>
+        <FIELD NAME="model" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="產生此版本的模型識別（NFR-MNT-03）"/>
+        <FIELD NAME="parsedat" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="confirmedby" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="FR-SYL-04 要求記錄確認者"/>
+        <FIELD NAME="confirmedat" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="usermodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+        <KEY NAME="confirmedby" TYPE="foreign" FIELDS="confirmedby" REFTABLE="user" REFFIELDS="id"/>
+        <KEY NAME="usermodified" TYPE="foreign" FIELDS="usermodified" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="courseid-version" UNIQUE="true" FIELDS="courseid, version"/>
+        <INDEX NAME="courseid-status" UNIQUE="false" FIELDS="courseid, status" COMMENT="取這門課的已確認課綱，是最高頻查詢"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_universityai_evtmap" COMMENT="課綱事件與 Moodle 事件的持久對應。唯一鍵即冪等性的實作方式（NFR-REL-04）。">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="刻意鍵在課程而非課綱版本，以跨版本存活"/>
+        <FIELD NAME="eventkey" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false" COMMENT="DM-SYLLABUS 的 events[].event_id，須由事件的穩定特徵推導"/>
+        <FIELD NAME="moodleeventid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="targettype" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="event" SEQUENCE="false" COMMENT="event 或 cm"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="courseid-eventkey" UNIQUE="true" FIELDS="courseid, eventkey"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_universityai_diff" COMMENT="兩個課綱版本的逐欄位比對結果，對應 DM-DIFF。">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="fromversion" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="toversion" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="changes" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="DM-DIFF.changes 的 JSON"/>
+        <FIELD NAME="summarytext" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="FR-DIF-03；比對結果為空時為 null 而非空字串"/>
+        <FIELD NAME="hasmajor" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="刻意的反正規化，供 FR-NTF-04 判定通知對象；只由 diff_engine 寫入"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="courseid-fromversion-toversion" UNIQUE="true" FIELDS="courseid, fromversion, toversion"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_universityai_summary" COMMENT="一列一則每週摘要（FR-SUM-01）。冪等鍵是 (courseid, weekstart)，weekstart 是課綱推算出的教學週起日而非日曆週。">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="weekstart" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="教學週起日的時間戳，由 term.start_date 推算"/>
+        <FIELD NAME="weekno" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="第幾教學週，供顯示用；權威值是 weekstart"/>
+        <FIELD NAME="version" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="同一 (courseid, weekstart) 內遞增，重新產生時保留舊版（FR-SUM-01）"/>
+        <FIELD NAME="syllabusversion" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="來源課綱版本（NFR-MNT-03）"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="generated" SEQUENCE="false" COMMENT="generated 或 noschedule"/>
+        <FIELD NAME="content" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="供師生檢視的摘要全文"/>
+        <FIELD NAME="facts" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="產生當下的輸入事實 JSON；沒有它就無法回答「是模型寫歪了還是資料本來就錯」"/>
+        <FIELD NAME="model" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="產生此摘要的模型識別（NFR-MNT-03）；noschedule 時為空"/>
+        <FIELD NAME="generatedat" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="courseid-weekstart-version" UNIQUE="true" FIELDS="courseid, weekstart, version"/>
+        <INDEX NAME="courseid-weekstart" UNIQUE="false" FIELDS="courseid, weekstart" COMMENT="冪等判斷與課程頁面的列表都走這個索引"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_universityai_ops" COMMENT="營運狀態紀錄，對應 DM-OPSTATUS。後綴取短是因為 Moodle 由表名衍生索引名並截斷至 30 字元。">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="operation" TYPE="char" LENGTH="30" NOTNULL="true" SEQUENCE="false" COMMENT="syllabus_parse / course_populate / event_create / calendar_push / weekly_summary / notify"/>
+        <FIELD NAME="targettype" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="syllabus / course / event / user"/>
+        <FIELD NAME="targetid" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="success / failed / retrying"/>
+        <FIELD NAME="attempt" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
+        <FIELD NAME="error" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="失敗原因；寫入前須經 §6 的過濾，錯誤訊息常夾帶請求內容"/>
+        <FIELD NAME="occurredat" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="operation-occurredat" UNIQUE="false" FIELDS="operation, occurredat" COMMENT="面板依類型看最近狀況"/>
+        <INDEX NAME="targettype-targetid" UNIQUE="false" FIELDS="targettype, targetid" COMMENT="追某一份課綱的歷程；也是通知去重的查詢條件"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>

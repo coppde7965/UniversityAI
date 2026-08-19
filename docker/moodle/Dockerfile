@@ -39,10 +39,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libxml2-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 產生 zh_TW.UTF-8。沒有它，Moodle 每次安裝與排序都會噴
-# U_USING_FALLBACK_WARNING 說找不到這個地區設定。警告本身不致命，但站台
-# 語言是繁體中文，讓它每次都出現只會訓練人忽略輸出裡的警告。
-RUN sed -i 's/^# *\(zh_TW.UTF-8\)/\1/' /etc/locale.gen \
+# 兩個地區設定都要產生：
+#
+#   zh_TW.UTF-8  站台語言。沒有它，Moodle 每次安裝與排序都會噴
+#                U_USING_FALLBACK_WARNING 說找不到這個地區設定。警告本身
+#                不致命，但讓它每次都出現只會訓練人忽略輸出裡的警告。
+#
+#   en_AU.UTF-8  Moodle 的 PHPUnit 環境**硬性要求**這一個，缺了會在
+#                init 階段直接中止："Required locale 'en_AU.UTF-8' is not
+#                installed."。與站台語言無關，也不能改設定繞過——它寫死在
+#                核心的測試環境檢查裡。
+RUN sed -i 's/^# *\(zh_TW\.UTF-8\)/\1/; s/^# *\(en_AU\.UTF-8\)/\1/' /etc/locale.gen \
     && locale-gen
 ENV LANG=zh_TW.UTF-8 LC_ALL=zh_TW.UTF-8
 
@@ -51,10 +58,6 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         pgsql pdo_pgsql gd intl zip soap exif
 
 COPY moodle/php.ini /usr/local/etc/php/conf.d/zz-universityai.ini
-
-# 實作腳本兩個 target 都要（安裝跑在 web、測試跑在 tools），所以放在 base。
-COPY bin/ /usr/local/bin/
-RUN chmod +x /usr/local/bin/uai-*.sh
 
 WORKDIR /var/www/moodle
 
@@ -67,6 +70,16 @@ RUN a2enmod rewrite headers expires
 COPY moodle/vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY moodle/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# 實作腳本刻意放在**最後一層**，兩個 target 各自複製一次而不是放在 base。
+#
+# 放 base 的話，改一行 shell 腳本就會讓 base 之後的每一層失效，其中包括
+# tools 階段那個要下載整套相依的 composer create-project。實際發生過：改了
+# 一個 uai-*.php 之後 make lint 全項失敗，訊息是「Failed to find Composer's
+# autoload file」——因為那次重建時 create-project 的相依安裝失敗，而它後面
+# 接著 || echo，錯誤被吞掉了。
+COPY bin/ /usr/local/bin/
+RUN chmod +x /usr/local/bin/uai-*.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["apache2-foreground"]
@@ -87,10 +100,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # moodle-plugin-ci 裝在容器內的獨立目錄，不污染專案目錄。
-# 這一步失敗不阻擋其他目標——lint 之外的功能都不依賴它。
+#
+# 失敗仍不阻擋建置——lint 之外的目標都不依賴它，為了一次網路問題就讓
+# make up 整個失敗不划算。但**失敗必須留下痕跡**：原本只有 || echo，而
+# create-project 會先把原始碼放好、再裝相依，相依那步失敗時 /opt/plugin-ci
+# 看起來是存在的，bin/moodle-plugin-ci 也在，只有 vendor/ 不見。結果是
+# make lint 每一項都以「Failed to find Composer's autoload file」失敗，
+# 完全看不出跟映像建置有關。
+#
+# 現在改成：裝完檢查 vendor/autoload.php，缺了就寫一個標記檔，由
+# uai-lint.sh 讀出來給明確指示。
 RUN composer create-project moodlehq/moodle-plugin-ci /opt/plugin-ci ^4 \
         --no-progress --no-interaction \
-    || echo "moodle-plugin-ci 安裝失敗；make lint 會提示，其餘目標不受影響"
+    || echo "moodle-plugin-ci 安裝失敗" ; \
+    if [ ! -f /opt/plugin-ci/vendor/autoload.php ]; then \
+        echo "moodle-plugin-ci 的相依未安裝完成（缺 vendor/autoload.php）" \
+            > /opt/plugin-ci-broken ; \
+        echo "⚠ moodle-plugin-ci 安裝不完整，make lint 會提示如何修復。" ; \
+    fi
 ENV PATH="/opt/plugin-ci/bin:${PATH}"
+
+# 理由同 web target：放在最後一層，改腳本不會讓上面那些昂貴的層失效。
+COPY bin/ /usr/local/bin/
+RUN chmod +x /usr/local/bin/uai-*.sh
 
 CMD ["sleep", "infinity"]

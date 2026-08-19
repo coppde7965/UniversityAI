@@ -44,18 +44,30 @@ x-code-volumes: &code-volumes
   #   block_universityai → 第四階段
   - ./plugins/local_universityai:/var/www/moodle/public/local/universityai
   # - ./plugins/block_universityai:/var/www/moodle/public/blocks/universityai
-  # - ./plugins/aiprovider_claude:/var/www/moodle/public/ai/provider/claude
+  - ./plugins/aiprovider_claude:/var/www/moodle/public/ai/provider/claude
 
   # 三個資料目錄，全部 .gitignore
   - ./moodledata:/var/www/moodledata
   - ./behatdata:/var/www/behatdata
   - ./phpunitdata:/var/www/phpunitdata
 
+  # Moodle 的快取目錄（MUC、編譯後的 Mustache 模板、暫存）。
+  # 具名磁碟區而非 bind mount——理由與 A-08 相同，見 A-09。
+  # 這些是可拋棄的快取，不是資料，make clean 一併清掉沒有損失。
+  - moodlecache:/var/www/moodlecache
+
   # 補充設定，由 config.php 以 require_once 載入（architecture.md §7.4）
   - ./docker/config-extra.php:/opt/uai/config-extra.php:ro
 
-  # 去識別化規則。PHP 與 Python 兩邊讀同一份（A-05）
-  - ./redaction-rules.json:/opt/uai/redaction-rules.json:ro
+  # 去識別化規則**不在這裡掛載**。A-15 之後它住在外掛目錄裡，隨上面那行
+  # 外掛掛載一起進來——額外掛一份到 /opt/uai/ 會變成第二個來源，而「同一份
+  # 規則」正是 A-05 的全部重點。Python 端在 eval 服務中直接讀外掛目錄。
+
+  # 評測工具鏈（bdd-guide 的 L3 層）。第三階段起 PHP 這一側也要進得去：
+  # 課綱測試集的固定樣本由 PHP 產生（TCPDF 是環境裡唯一能排出中文 PDF 的
+  # 工具），正確率量測則要同時讀得到樣本與標準答案。掛成可寫，因為產生
+  # 樣本會寫檔。
+  - ./eval:/opt/uai/eval
 
   # 資料庫傾印的輸出位置。這是換機展示的搬移方式（D-04）
   - ./db/dumps:/dumps
@@ -179,7 +191,10 @@ services:
     working_dir: /work
     volumes:
       - ./eval:/work
-      - ./redaction-rules.json:/opt/uai/redaction-rules.json:ro
+      # 唯讀掛入外掛裡的那一份規則與樣本，不另存副本（A-05、A-15）。
+      # 這是 Python 端「與 PHP 讀同一份」的實作方式。
+      - ./plugins/local_universityai/redaction-rules.json:/opt/uai/redaction-rules.json:ro
+      - ./plugins/local_universityai/redaction-samples.json:/opt/uai/redaction-samples.json:ro
     command: ["sleep", "infinity"]
     networks: [uai]
     restart: unless-stopped
@@ -187,6 +202,7 @@ services:
 volumes:
   dbdata:
   moodlesrc:
+  moodlecache:
 
 networks:
   uai:

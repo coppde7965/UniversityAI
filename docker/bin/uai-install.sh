@@ -37,9 +37,9 @@ if [ -f config.php ] && ! php admin/cli/cfg.php --name=version >/dev/null 2>&1; 
 fi
 
 if [ -f config.php ]; then
-    echo "[1/4] config.php 已存在，略過站台安裝。"
+    echo "[1/6] config.php 已存在，略過站台安裝。"
 else
-    echo "[1/4] 安裝 Moodle 站台 …"
+    echo "[1/6] 安裝 Moodle 站台 …"
     # 注意 CLI 腳本在專案根目錄的 admin/cli/，不在 public/ 之下。
     as_web "php admin/cli/install.php \
         --lang='${MOODLE_LANG}' \
@@ -67,9 +67,9 @@ fi
 # 必須插在那一行之前——setup.php 一旦載入，設定就來不及生效。
 # ---------------------------------------------------------------------------
 if grep -q 'config-extra.php' config.php 2>/dev/null; then
-    echo "[2/4] 補充設定已注入，略過。"
+    echo "[2/6] 補充設定已注入，略過。"
 else
-    echo "[2/4] 注入補充設定 …"
+    echo "[2/6] 注入補充設定 …"
     line=$(grep -n "lib/setup\.php" config.php | head -1 | cut -d: -f1 || true)
     if [ -z "$line" ]; then
         echo "config.php 的結構與預期不符，找不到 lib/setup.php 這一行。" >&2
@@ -94,16 +94,37 @@ fi
 # 掛載進來的三個外掛只要有 version.php 就會被這一步認出來並安裝。
 # 目前只有空目錄時，Moodle 會直接忽略（外掛掃描以 version.php 為準）。
 # ---------------------------------------------------------------------------
-echo "[3/4] 安裝／升級外掛 …"
+echo "[3/6] 安裝／升級外掛 …"
 as_web "php admin/cli/upgrade.php --non-interactive"
 
 # ---------------------------------------------------------------------------
-# 4. 示範課程
+# 4. 管理員信箱
+#
+# 每次都對齊 .env，不是只在第一次安裝時設定：資料庫是留存的，改了
+# .env.example 對已經裝好的站台沒有作用。理由見 uai-admin-email.php。
+# ---------------------------------------------------------------------------
+echo "[4/6] 對齊管理員信箱 …"
+as_web "php /usr/local/bin/uai-admin-email.php \
+    --username='${MOODLE_ADMIN_USER}' \
+    --email='${MOODLE_ADMIN_EMAIL}'"
+
+# ---------------------------------------------------------------------------
+# 5. AI 供應商執行個體
+#
+# 沒有金鑰時腳本會自己跳過，不阻擋安裝。理由與可攜性見 uai-aiprovider.php。
+# ---------------------------------------------------------------------------
+echo "[5/6] 設定 AI 供應商 …"
+as_web "php /usr/local/bin/uai-aiprovider.php \
+    --apikey='${ANTHROPIC_API_KEY:-}' \
+    --model='${ANTHROPIC_MODEL:-}'"
+
+# ---------------------------------------------------------------------------
+# 6. 示範課程
 #
 # D-10 之後課程外殼必須先存在才能上傳課綱。每次重建環境都手動建一次很煩，
 # 而且展示前忘記建會很尷尬，所以放進安裝流程。
 # ---------------------------------------------------------------------------
-echo "[4/4] 建立示範課程 …"
+echo "[6/6] 建立示範課程 …"
 as_web "php /usr/local/bin/uai-democourse.php \
     --shortname='${DEMO_COURSE_SHORTNAME}' \
     --fullname='${DEMO_COURSE_FULLNAME}'"

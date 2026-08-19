@@ -1,0 +1,175 @@
+{
+  "$comment": [
+    "第三階段閘門用的固定樣本（docs/architecture.md §9.9 第 1 題）。",
+    "",
+    "要回答的問題只有一個：課綱 PDF 直接送 API，與先自行抽出文字再送，",
+    "兩條路的正確率差多少。差距夠大就值得為了版面資訊放棄 NFR-SEC-06 的",
+    "二進位過濾；差距不大就沒有理由那樣做。",
+    "",
+    "**這些是合成樣本，不是 OI-03 的測試集。** 合成的理由有兩個：真實課綱",
+    "含授課教師姓名與聯絡方式，不得進版控（.gitignore 排除 corpus/）；而且",
+    "版面陷阱要能被刻意控制才量得出「版面到底有沒有幫助」。FR-SYL-02 要求的",
+    "「不少於 20 份真實課綱、正確率 ≥ 80%」是另一件事，仍未完成。",
+    "",
+    "結構化資料是唯一的事實來源：PDF 由下面的 weeks/events 依 layout 渲染而成，",
+    "標準答案也是同一份資料。兩者不可能漂移——手寫兩份一定會。",
+    "",
+    "每份樣本都刻意含教師姓名與信箱，讓過濾路徑一併被走到。"
+  ],
+  "version": 1,
+  "fixtures": [
+    {
+      "id": "f1-table",
+      "layout": "table",
+      "trap": "標準表格。抽成文字後欄位邊界消失，只剩空白分隔。",
+      "course": {
+        "title": "人工智慧導論",
+        "code": "CS3025",
+        "teacher": "陳怡君",
+        "teacher_email": "chen.yj@example.edu.tw",
+        "semester": "114-1",
+        "credits": 3
+      },
+      "term": { "start_date": "2025-09-09", "total_weeks": 6, "weekday": "TUE" },
+      "grading": [
+        { "item": "作業", "weight": 30 },
+        { "item": "期中考", "weight": 30 },
+        { "item": "期末專題", "weight": 40 }
+      ],
+      "weeks": [
+        { "week_no": 1, "date": "2025-09-09", "topic": "課程介紹與人工智慧發展簡史", "note": "" },
+        { "week_no": 2, "date": "2025-09-16", "topic": "搜尋演算法：BFS 與 DFS", "note": "作業一出題" },
+        { "week_no": 3, "date": "2025-09-23", "topic": "啟發式搜尋與 A*", "note": "" },
+        { "week_no": 4, "date": "2025-09-30", "topic": "知識表示與推理", "note": "作業一截止" },
+        { "week_no": 5, "date": "2025-10-07", "topic": "機器學習概論", "note": "" },
+        { "week_no": 6, "date": "2025-10-14", "topic": "期中考", "note": "考試範圍第 1 至 5 週" }
+      ],
+      "events": [
+        { "type": "assignment", "title": "作業一", "due_date": "2025-09-30", "due_time": "23:59" },
+        { "type": "exam", "title": "期中考", "due_date": "2025-10-14", "due_time": null }
+      ]
+    },
+    {
+      "id": "f2-two-column",
+      "layout": "two_column",
+      "trap": "兩欄版面。抽成文字時左右欄會交錯，週次順序被打亂——這是版面資訊消失最典型的失敗。",
+      "course": {
+        "title": "資料結構",
+        "code": "CS2010",
+        "teacher": "林建宏",
+        "teacher_email": "lin.ch@example.edu.tw",
+        "semester": "114-1",
+        "credits": 3
+      },
+      "term": { "start_date": "2025-09-10", "total_weeks": 6, "weekday": "WED" },
+      "grading": [
+        { "item": "隨堂測驗", "weight": 20 },
+        { "item": "程式作業", "weight": 40 },
+        { "item": "期末考", "weight": 40 }
+      ],
+      "weeks": [
+        { "week_no": 1, "date": "2025-09-10", "topic": "陣列與鏈結串列", "note": "" },
+        { "week_no": 2, "date": "2025-09-17", "topic": "堆疊與佇列", "note": "程式作業一發布" },
+        { "week_no": 3, "date": "2025-09-24", "topic": "樹與二元搜尋樹", "note": "" },
+        { "week_no": 4, "date": "2025-10-01", "topic": "平衡樹與 AVL", "note": "程式作業一截止" },
+        { "week_no": 5, "date": "2025-10-08", "topic": "雜湊表", "note": "隨堂測驗" },
+        { "week_no": 6, "date": "2025-10-15", "topic": "圖與最短路徑", "note": "" }
+      ],
+      "events": [
+        { "type": "assignment", "title": "程式作業一", "due_date": "2025-10-01", "due_time": "23:59" },
+        { "type": "other", "title": "隨堂測驗", "due_date": "2025-10-08", "due_time": null }
+      ]
+    },
+    {
+      "id": "f3-plain-list",
+      "layout": "plain_list",
+      "trap": "純條列，沒有版面資訊可言。這是對照組——兩條路在這裡應該打平，若沒有打平就代表量到的是別的東西。",
+      "course": {
+        "title": "作業系統",
+        "code": "CS3110",
+        "teacher": "王世傑",
+        "teacher_email": "wang.sc@example.edu.tw",
+        "semester": "114-1",
+        "credits": 3
+      },
+      "term": { "start_date": "2025-09-11", "total_weeks": 6, "weekday": "THU" },
+      "grading": [
+        { "item": "作業", "weight": 40 },
+        { "item": "期中考", "weight": 30 },
+        { "item": "期末考", "weight": 30 }
+      ],
+      "weeks": [
+        { "week_no": 1, "date": "2025-09-11", "topic": "作業系統概論", "note": "" },
+        { "week_no": 2, "date": "2025-09-18", "topic": "行程與執行緒", "note": "" },
+        { "week_no": 3, "date": "2025-09-25", "topic": "排程演算法", "note": "作業一發布" },
+        { "week_no": 4, "date": "2025-10-02", "topic": "同步與死結", "note": "" },
+        { "week_no": 5, "date": "2025-10-09", "topic": "記憶體管理", "note": "作業一截止" },
+        { "week_no": 6, "date": "2025-10-16", "topic": "虛擬記憶體", "note": "" }
+      ],
+      "events": [
+        { "type": "assignment", "title": "作業一", "due_date": "2025-10-09", "due_time": "18:00" }
+      ]
+    },
+    {
+      "id": "f5-interleaved",
+      "layout": "two_column_reversed",
+      "trap": "真正會交錯的兩欄：右欄先寫入內容流、左欄後寫，抽出的文字順序因此是第 4 至 6 週在前、第 1 至 3 週在後。f2 用巢狀表格模擬雙欄，實測**沒有**交錯（TCPDF 依邏輯順序輸出），所以另做這一份。",
+      "course": {
+        "title": "離散數學",
+        "code": "MA2020",
+        "teacher": "黃俊傑",
+        "teacher_email": "huang.cc@example.edu.tw",
+        "semester": "114-1",
+        "credits": 3
+      },
+      "term": { "start_date": "2025-09-08", "total_weeks": 6, "weekday": "MON" },
+      "grading": [
+        { "item": "作業", "weight": 40 },
+        { "item": "期中考", "weight": 25 },
+        { "item": "期末考", "weight": 35 }
+      ],
+      "weeks": [
+        { "week_no": 1, "date": "2025-09-08", "topic": "命題邏輯", "note": "" },
+        { "week_no": 2, "date": "2025-09-15", "topic": "述詞邏輯與量詞", "note": "作業一發布" },
+        { "week_no": 3, "date": "2025-09-22", "topic": "集合與關係", "note": "" },
+        { "week_no": 4, "date": "2025-09-29", "topic": "函數與基數", "note": "作業一截止" },
+        { "week_no": 5, "date": "2025-10-06", "topic": "數學歸納法", "note": "" },
+        { "week_no": 6, "date": "2025-10-13", "topic": "組合計數", "note": "期中考範圍公告" }
+      ],
+      "events": [
+        { "type": "assignment", "title": "作業一", "due_date": "2025-09-29", "due_time": "23:59" },
+        { "type": "exam", "title": "期中考", "due_date": "2025-10-13", "due_time": null }
+      ]
+    },
+    {
+      "id": "f4-sparse-table",
+      "layout": "sparse_table",
+      "trap": "表格但備註欄大量留白，且第 3 週停課沒有主題。抽成文字後每列的欄位數不一致，對位只能用猜的。",
+      "course": {
+        "title": "計算機網路",
+        "code": "CS3220",
+        "teacher": "張雅婷",
+        "teacher_email": "chang.yt@example.edu.tw",
+        "semester": "114-1",
+        "credits": 3
+      },
+      "term": { "start_date": "2025-09-12", "total_weeks": 6, "weekday": "FRI" },
+      "grading": [
+        { "item": "實驗報告", "weight": 50 },
+        { "item": "期末考", "weight": 50 }
+      ],
+      "weeks": [
+        { "week_no": 1, "date": "2025-09-12", "topic": "網路分層架構", "note": "" },
+        { "week_no": 2, "date": "2025-09-19", "topic": "實體層與資料連結層", "note": "實驗一" },
+        { "week_no": 3, "date": "2025-09-26", "topic": "停課（中秋節）", "note": "" },
+        { "week_no": 4, "date": "2025-10-03", "topic": "網路層與 IP", "note": "" },
+        { "week_no": 5, "date": "2025-10-10", "topic": "傳輸層與 TCP", "note": "實驗一報告截止" },
+        { "week_no": 6, "date": "2025-10-17", "topic": "應用層協定", "note": "" }
+      ],
+      "events": [
+        { "type": "other", "title": "實驗一", "due_date": "2025-09-19", "due_time": null },
+        { "type": "assignment", "title": "實驗一報告", "due_date": "2025-10-10", "due_time": "17:00" }
+      ]
+    }
+  ]
+}

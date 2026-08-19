@@ -45,6 +45,10 @@
 /eval/annotations/
 /eval/results/
 /eval/.venv/
+# 固定樣本的 PDF 由 make fixtures 產生，是衍生物不是原始碼。
+# 事實來源是 eval/fixtures/syllabi.json，那一份進版控。
+/eval/build/
+
 __pycache__/
 *.py[cod]
 

@@ -1,0 +1,63 @@
+{
+  "_comment": "外送過濾的黃金樣本（docs/architecture.md §6.2 的第 2 點）。PHP 端由 tests/redaction_filter_test.php 驗，Python 端於第三階段建立測試集去識別化時讀同一份檔。新增規則必須同時新增樣本，否則另一邊會因未實作而測試失敗——這讓不同步變成會被自動發現的錯誤。",
+  "version": 1,
+  "samples": [
+    {
+      "id": "email",
+      "input": "有問題請寄到 chen.yj@example.edu.tw 或來研究室。",
+      "expected": "有問題請寄到 [EMAIL] 或來研究室。"
+    },
+    {
+      "id": "phone_mobile",
+      "input": "助教手機 0912-345-678，急事再撥。",
+      "expected": "助教手機 [PHONE]，急事再撥。"
+    },
+    {
+      "id": "phone_landline",
+      "input": "系辦電話 02-23456789，週一至週五。",
+      "expected": "系辦電話 [PHONE]，週一至週五。"
+    },
+    {
+      "id": "identifiers",
+      "input": "學生 A123456789 與 B10912345 各繳交一份。",
+      "expected": "學生 [ID] 與 [ID] 各繳交一份。",
+      "note": "身分證規則必須排在學號規則之前，此樣本正是用來釘住那個順序。"
+    },
+    {
+      "id": "address",
+      "input": "上課地點：新北市三峽區大學路151號教學大樓",
+      "expected": "上課地點：[ADDRESS]教學大樓",
+      "note": "「上課地點：」不得被一併吃掉，這是 address_tw 那個 lookbehind 存在的理由。"
+    },
+    {
+      "id": "userid",
+      "input": "notify failed for userid=42",
+      "expected": "notify failed for userid=[ID]"
+    },
+    {
+      "id": "error_message",
+      "input": "HTTP 400 from 203.0.113.7: invalid api key sk-ant-api03-AbCdEf123456789",
+      "expected": "HTTP 400 from [IP]: invalid api key [APIKEY]",
+      "note": "§6.3：錯誤訊息是最容易被遺漏的外送路徑，而外部服務的錯誤常把金鑰與主機位址回貼進來。"
+    },
+    {
+      "id": "literal_teacher_name",
+      "input": "授課教師：陳怡君，聯絡方式見課程網頁。",
+      "literals": ["陳怡君"],
+      "expected": "授課教師：[NAME]，聯絡方式見課程網頁。",
+      "note": "中文姓名沒有可靠的樣式可比對，只能由呼叫端把已知的姓名當字面值傳入。這條樣本釘住的是那個機制存在，不是某個正規表示式。"
+    },
+    {
+      "id": "keep_week_schedule",
+      "input": "第 3 週　2025-09-23　知識表示與推理；作業一於 2025-09-23 23:59 前繳交。",
+      "expected": "第 3 週　2025-09-23　知識表示與推理；作業一於 2025-09-23 23:59 前繳交。",
+      "note": "反向樣本。過濾器最危險的失敗不是漏掉個資，而是把日期誤判成電話號碼——那會安靜地毀掉摘要的內容，而且沒有人會發現。"
+    },
+    {
+      "id": "keep_course_code",
+      "input": "課程代碼 CS3025，學分 3。",
+      "expected": "課程代碼 CS3025，學分 3。",
+      "note": "反向樣本：學號規則要求 8 位以上數字，正是為了不誤傷課程代碼。"
+    }
+  ]
+}

@@ -20,12 +20,13 @@ TAGS      ?=
 COMPONENT ?=
 FILE      ?=
 SERVICE   ?=
+RUNS      ?= 3
 
 .DEFAULT_GOAL := help
 
 .PHONY: help build up down restart ps logs shell shell-db shell-eval \
-        install lint test behat cron purge db-dump db-restore eval \
-        clean-moodle clean
+        install selftest ai-verify summary lint fix test behat cron purge db-dump db-restore \
+        fixtures syllabus-gate syllabus eval clean-moodle clean
 
 # ---------------------------------------------------------------------------
 help: ## 顯示可用指令
@@ -48,13 +49,20 @@ help: ## 顯示可用指令
 	@echo ""
 	@echo "  安裝與維運"
 	@echo "    make install       安裝站台、外掛與示範課程（可重複執行）"
+	@echo "    make selftest      逐項驗證外掛、資料表、管理選單、排程任務與通知"
+	@echo "    make ai-verify     第一·五階段閘門：AI 呼叫可行性（會呼叫 API 並產生費用）"
+	@echo "    make summary       第二階段端到端實跑：植入課綱→跑排程→讀回摘要（會呼叫 API）"
 	@echo "    make cron          手動跑一次 Moodle 排程"
 	@echo "    make purge         清除 Moodle 快取"
 	@echo ""
 	@echo "  品質"
 	@echo "    make lint          程式碼與 feature 檔檢查（NFR-MNT-04）"
+	@echo "    make fix           自動修正格式問題（不要直接跑 phpcbf）"
 	@echo "    make test          PHPUnit（COMPONENT=local_universityai 可指定）"
 	@echo "    make behat         Behat（TAGS=@FR-SYL-02 可指定）"
+	@echo "    make fixtures      產生課綱固定樣本（PDF 與抽出的文字）"
+	@echo "    make syllabus-gate 第三階段閘門：PDF 直送 vs 先抽文字（會呼叫 API）"
+	@echo "    make syllabus      課綱上傳與解析的端到端實跑（會呼叫 API）"
 	@echo "    make eval          課綱解析正確率量測"
 	@echo ""
 	@echo "  資料庫"
@@ -114,6 +122,19 @@ shell-eval: ## 進入評測工具容器
 install: .env ## 安裝站台、外掛與示範課程（冪等，可重複執行）
 	$(DC) exec -T moodle uai-install.sh
 
+# SRS §8.4 第一階段的驗收。失敗時以非零狀態結束，所以可以放進 CI。
+selftest: ## 驗證外掛的安裝、資料表、排程任務與通知
+	$(DC) exec -T moodle uai-selftest.sh
+
+# SRS §8.4 第一·五階段的閘門。RUNS=5 可改每項實驗的次數。
+ai-verify: ## AI 呼叫可行性驗證（會實際呼叫 API）
+	$(DC) exec -T moodle uai-ai-verify.sh --runs=$(RUNS)
+
+# SRS §8.4 第二階段的驗收。刻意把「植入課綱」也包進來：沒有課綱時排程任務
+# 會安靜地什麼都不做並回報成功，那種綠燈驗不到任何東西（§4.8 的教訓）。
+summary: ## 每週摘要的端到端實跑（會實際呼叫 API）
+	$(DC) exec -T moodle uai-summary.sh
+
 cron: ## 手動跑一次 Moodle 排程
 	$(DC) exec -T moodle php admin/cli/cron.php
 
@@ -133,6 +154,11 @@ purge: ## 清除 Moodle 快取
 lint: ## 程式碼與 feature 檔檢查
 	$(DC) exec -T tools uai-lint.sh
 
+# 一定要用這個而不是直接跑 phpcbf：phpcbf 不讀 thirdpartylibs.xml，
+# 會去「修正」併入的第三方程式庫。理由詳見 uai-fix.sh。
+fix: ## 自動修正可修正的格式問題
+	$(DC) exec -T tools uai-fix.sh
+
 test: ## PHPUnit 單元測試
 	$(DC) exec -T tools uai-test.sh $(COMPONENT)
 
@@ -141,6 +167,23 @@ test: ## PHPUnit 單元測試
 behat: ## Behat 驗收測試
 	$(DC) --profile test up -d selenium
 	$(DC) exec -T tools uai-behat.sh $(TAGS)
+
+# 兩步：PDF 由 moodle 容器的 TCPDF 產生（環境裡唯一排得出中文 PDF 的工具），
+# 抽文字由 eval 容器的 pypdf 做。事實來源是 eval/fixtures/syllabi.json，
+# 產出的 PDF 與 txt 都是衍生物，不進版控。
+fixtures: ## 產生課綱固定樣本
+	$(DC) exec -T moodle php /usr/local/bin/uai-fixture-build.php
+	$(DC) --profile eval up -d eval
+	$(DC) exec -T eval uv run python -m evaluation.extract_text
+
+# architecture.md §9.9 第 1 題的實測。先跑 make fixtures。
+syllabus-gate: ## PDF 直送 vs 先抽文字的正確率對照（會呼叫 API）
+	$(DC) exec -T moodle php /usr/local/bin/uai-syllabus-gate.php --runs=$(RUNS)
+
+# FR-SYL-01 與 FR-SYL-02 的端到端驗收。上傳走真實的網頁表單、解析走 Moodle
+# 的臨機任務執行器——繞過任一邊，驗到的就不是使用者實際會走的路。
+syllabus: ## 課綱上傳與解析的端到端實跑（會呼叫 API）
+	$(DC) exec -T moodle uai-syllabus-e2e.sh
 
 eval: ## 課綱解析正確率量測
 	$(DC) --profile eval up -d eval

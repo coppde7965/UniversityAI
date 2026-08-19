@@ -1,0 +1,120 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_universityai/syllabus_list
+
+    Uploaded syllabus versions for a course (FR-SYL-01).
+
+    Every conditional here is a pre-computed boolean. The template never
+    compares a status string: that comparison is business logic and lives
+    in the ViewModel.
+
+    Context variables required for this template:
+    * hasitems boolean - Whether any version has been uploaded.
+    * items array - One entry per version, newest first.
+    * courseid int - The course this list belongs to.
+
+    Example context (json):
+    {
+        "hasitems": true,
+        "courseid": 2,
+        "items": [
+            {
+                "version": 1,
+                "versionlabel": "Version 1",
+                "statuslabel": "Awaiting confirmation",
+                "ispending": false,
+                "isparsed": true,
+                "isconfirmed": false,
+                "isfailed": false,
+                "uploadedat": "19/08/26, 14:02",
+                "hasparsed": true,
+                "parsedat": "19/08/26, 14:03",
+                "model": "claude-haiku-4-5",
+                "hasmodel": true,
+                "filename": "syllabus.pdf",
+                "hasfile": true,
+                "fileurl": "https://example.com/pluginfile.php/1/local_universityai/syllabus/1/syllabus.pdf",
+                "canreview": true,
+                "reviewurl": "https://example.com/local/universityai/review.php?id=1",
+                "reviewlabel": "Review",
+                "canpopulate": false,
+                "populateurl": "https://example.com/local/universityai/populate.php?id=1"
+            }
+        ]
+    }
+}}
+<div class="local-universityai-syllabi mt-4">
+    <h3 class="h5">{{#str}}syllabus:listheading, local_universityai{{/str}}</h3>
+
+    {{^hasitems}}
+        <div class="alert alert-info" role="status">
+            {{#str}}syllabus:none, local_universityai{{/str}}
+        </div>
+    {{/hasitems}}
+
+    {{#hasitems}}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <caption class="visually-hidden">{{#str}}syllabus:listheading, local_universityai{{/str}}</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">{{#str}}syllabus:colversion, local_universityai{{/str}}</th>
+                        <th scope="col">{{#str}}syllabus:colstatus, local_universityai{{/str}}</th>
+                        <th scope="col">{{#str}}syllabus:colfile, local_universityai{{/str}}</th>
+                        <th scope="col">{{#str}}syllabus:coluploaded, local_universityai{{/str}}</th>
+                        <th scope="col">{{#str}}syllabus:colparsed, local_universityai{{/str}}</th>
+                        <th scope="col"><span class="visually-hidden">{{#str}}review:action, local_universityai{{/str}}</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#items}}
+                        <tr>
+                            <th scope="row">{{versionlabel}}</th>
+                            <td>
+                                {{#ispending}}<span class="badge bg-secondary">{{statuslabel}}</span>{{/ispending}}
+                                {{#isparsed}}<span class="badge bg-warning text-dark">{{statuslabel}}</span>{{/isparsed}}
+                                {{#isconfirmed}}<span class="badge bg-success">{{statuslabel}}</span>{{/isconfirmed}}
+                                {{#isfailed}}<span class="badge bg-danger">{{statuslabel}}</span>{{/isfailed}}
+                            </td>
+                            <td>
+                                {{#hasfile}}<a href="{{fileurl}}">{{filename}}</a>{{/hasfile}}
+                                {{^hasfile}}&mdash;{{/hasfile}}
+                            </td>
+                            <td>{{uploadedat}}</td>
+                            <td>
+                                {{#hasparsed}}
+                                    {{parsedat}}
+                                    {{#hasmodel}}<span class="text-muted small d-block">{{model}}</span>{{/hasmodel}}
+                                {{/hasparsed}}
+                                {{^hasparsed}}&mdash;{{/hasparsed}}
+                            </td>
+                            <td>
+                                {{#canreview}}
+                                    <a class="btn btn-sm btn-secondary" href="{{reviewurl}}">{{reviewlabel}}</a>
+                                {{/canreview}}
+                                {{#canpopulate}}
+                                    <a class="btn btn-sm btn-primary" href="{{populateurl}}">{{#str}}populate:action, local_universityai{{/str}}</a>
+                                {{/canpopulate}}
+                            </td>
+                        </tr>
+                    {{/items}}
+                </tbody>
+            </table>
+        </div>
+    {{/hasitems}}
+</div>
